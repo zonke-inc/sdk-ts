@@ -1,8 +1,11 @@
 import axios from 'axios';
+import { cpSync, mkdtempSync, rmSync } from 'fs-extra';
+import { tmpdir } from 'os';
+import { basename, join } from 'path';
 
 import {
   PreviewEnvironment,
-  PreviewEnvironmentDeploymentEndpoint,
+  PreviewEnvironmentVersion,
 } from './model';
 import {
   CreatePreviewEnvironmentPayload,
@@ -18,12 +21,12 @@ import {  zipDirectory } from './util';
  * 
  * @returns The preview environment that was created. The versions array will always be empty.
  */
-export function createPreviewEnvironment({
+export async function createPreviewEnvironment({
   userId,
   framework,
   awsHostedZone,
 }: CreatePreviewEnvironmentPayload): Promise<PreviewEnvironment> {
-  return axios.post(
+  const { data } = await axios.post(
     `${process.env['ZONKE_API_ENDPOINT']}/preview-environment/create`,
     {
       userId,
@@ -39,6 +42,8 @@ export function createPreviewEnvironment({
       },
     },
   );
+
+  return data;
 }
 
 
@@ -54,8 +59,8 @@ export async function deployToPreviewEnvironment({
   environmentId,
   buildOutputDirectory,
   uploadLinkExpirationOverride,
-}: DeployToPreviewEnvironmentPayload): Promise<PreviewEnvironment> {
-  const deploymentEndpoint: PreviewEnvironmentDeploymentEndpoint = await axios.post(
+}: DeployToPreviewEnvironmentPayload): Promise<PreviewEnvironmentVersion> {
+  const { data } = await axios.post(
     `${process.env['ZONKE_API_ENDPOINT']}/preview-environment/deployment-endpoint`,
     {
       environmentId,
@@ -71,10 +76,16 @@ export async function deployToPreviewEnvironment({
     },
   );
 
-  const zipFileBuffer = await zipDirectory(buildOutputDirectory);
+  // Copy the build output directory to a temporary directory to preserve the original directory name.
+  const outDirectory = mkdtempSync(join(tmpdir(), 'zip-'));
+  cpSync(buildOutputDirectory, join(outDirectory, basename(buildOutputDirectory)), {
+    recursive: true,
+  });
 
-  const response = await axios.put(
-    deploymentEndpoint.presignedDeploymentEndpoint,
+  const zipFileBuffer = await zipDirectory(outDirectory);
+
+  const { headers } = await axios.put(
+    data.presignedDeploymentEndpoint,
     zipFileBuffer,
     {
       headers: {
@@ -84,19 +95,15 @@ export async function deployToPreviewEnvironment({
     },
   );
 
-  const versionId = response.headers['x-amz-version-id'];
+  rmSync(outDirectory, {
+    recursive: true,
+  });
 
   return {
-    environmentId,
-    endpoint: deploymentEndpoint.presignedDeploymentEndpoint,
-    versions: [
-      {
-        versionId,
-        isLatest: true,
-        // You do not need to keep this date. The `getPreviewEnvironment` will provide a more accurate date.
-        lastUpdated: new Date().toISOString(),
-      },
-    ],
+    isLatest: true,
+    versionId: headers['x-amz-version-id'],
+    // You do not need to keep this date. The `getPreviewEnvironment` will provide a more accurate date.
+    lastUpdated: new Date().toISOString(),
   };
 }
 
@@ -104,8 +111,8 @@ export async function deployToPreviewEnvironment({
 /**
  * Gets the preview environment with the specified ID.
  */
-export function getPreviewEnvironment(environmentId: string): Promise<PreviewEnvironment> {
-  return axios.post(
+export async function getPreviewEnvironment(environmentId: string): Promise<PreviewEnvironment> {
+  const { data } = await axios.post(
     `${process.env['ZONKE_API_ENDPOINT']}/preview-environment`,
     {
       environmentId,
@@ -119,17 +126,19 @@ export function getPreviewEnvironment(environmentId: string): Promise<PreviewEnv
       },
     },
   );
+
+  return data;
 }
 
 
 /**
  * Get the status of a preview environment deployment.
  */
-export function getDeploymentStatus({
+export async function getDeploymentStatus({
   environmentId,
   sourceVersion,
 }: PreviewEnvironmentDeploymentStatusPayload): Promise<PreviewEnvironment> {
-  return axios.post(
+  const { data } = await axios.post(
     `${process.env['ZONKE_API_ENDPOINT']}/preview-environment/deployment-status`,
     {
       environmentId,
@@ -144,6 +153,8 @@ export function getDeploymentStatus({
       },
     },
   );
+
+  return data;
 }
 
 
@@ -151,11 +162,11 @@ export function getDeploymentStatus({
  * Reverts a preview environment to a previous version. A new version will be created with the same code as the
  * specified version. It is up to you to establish a relationship between the new and reverted versions.
  */
-export function revertPreviewEnvironmentToVersion({
+export async function revertPreviewEnvironmentToVersion({
   environmentId,
   sourceVersion,
 }: PreviewEnvironmentDeploymentStatusPayload): Promise<PreviewEnvironment> {
-  return axios.post(
+  const { data } = await axios.post(
     `${process.env['ZONKE_API_ENDPOINT']}/preview-environment/revert`,
     {
       environmentId,
@@ -170,4 +181,6 @@ export function revertPreviewEnvironmentToVersion({
       },
     },
   );
+
+  return data;
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@zonke/sdk",
+  "name": "@zonke-inc/sdk",
   "version": "0.1.0",
   "description": "Thin wrapper around Zonké infrastructure management API",
   "main": "index.js",
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:zonke-inc/sdk-ts.git"
+    "url": "git+ssh://git@github.com/zonke-inc/sdk-ts.git"
   },
   "keywords": [
     "zonke",
