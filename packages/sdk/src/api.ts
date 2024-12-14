@@ -1,10 +1,11 @@
 import axios from 'axios';
 import { cpSync, mkdtempSync, rmSync } from 'fs-extra';
 import { tmpdir } from 'os';
-import { basename, join } from 'path';
+import { basename, join, resolve } from 'path';
 
 import {
   PreviewEnvironment,
+  PreviewEnvironmentDeploymentStatus,
   PreviewEnvironmentVersion,
 } from './model';
 import {
@@ -51,11 +52,12 @@ export async function createPreviewEnvironment({
  * Uploads a build output directory to trigger a preview environment deployment. Depending on the framework, there 
  * might be post-processing steps required to build the preview environment. For example, Next.js standalone output
  * requires a post-build step to separate the serverless functions from the static assets. The initial deployment
- * might take a few minutes to complete. you can check the status of the deployment by calling `getDeploymentStatus`.
+ * might take a few minutes to complete. You can check the status of the deployment by calling `getDeploymentStatus`.
  * 
  * @returns The preview environment that was deployed to. The versions array will contain the version that was deployed.
  */
 export async function deployToPreviewEnvironment({
+  message,
   environmentId,
   buildOutputDirectory,
   uploadLinkExpirationOverride,
@@ -78,7 +80,7 @@ export async function deployToPreviewEnvironment({
 
   // Copy the build output directory to a temporary directory to preserve the original directory name.
   const outDirectory = mkdtempSync(join(tmpdir(), 'zip-'));
-  cpSync(buildOutputDirectory, join(outDirectory, basename(buildOutputDirectory)), {
+  cpSync(buildOutputDirectory, join(outDirectory, basename(resolve(buildOutputDirectory))), {
     recursive: true,
   });
 
@@ -99,12 +101,35 @@ export async function deployToPreviewEnvironment({
     recursive: true,
   });
 
-  return {
+  const version: PreviewEnvironmentVersion = {
+    message,
     isLatest: true,
-    versionId: headers['x-amz-version-id'],
-    // You do not need to keep this date. The `getPreviewEnvironment` will provide a more accurate date.
     lastUpdated: new Date().toISOString(),
+    versionId: headers['x-amz-version-id'],
   };
+
+  if (message) {
+    // A deployment tracker is not created in Zonké until after the code is uploaded to S3, so we have to set the 
+    // message after the deployment has been triggered.
+    await axios.post(
+      `${process.env['ZONKE_API_ENDPOINT']}/preview-environment/set-deployment-message`,
+      {
+        message,
+        environmentId,
+        sourceVersion: version.versionId,
+      },
+      {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'x-zonke-api-key': process.env['ZONKE_API_KEY'],
+          'x-zonke-api-token': process.env['ZONKE_API_TOKEN'],
+        },
+      },
+    );
+  }
+
+  return version;
 }
 
 
@@ -137,7 +162,7 @@ export async function getPreviewEnvironment(environmentId: string): Promise<Prev
 export async function getDeploymentStatus({
   environmentId,
   sourceVersion,
-}: PreviewEnvironmentDeploymentStatusPayload): Promise<PreviewEnvironment> {
+}: PreviewEnvironmentDeploymentStatusPayload): Promise<PreviewEnvironmentDeploymentStatus> {
   const { data } = await axios.post(
     `${process.env['ZONKE_API_ENDPOINT']}/preview-environment/deployment-status`,
     {
@@ -165,9 +190,9 @@ export async function getDeploymentStatus({
 export async function revertPreviewEnvironmentToVersion({
   environmentId,
   sourceVersion,
-}: PreviewEnvironmentDeploymentStatusPayload): Promise<PreviewEnvironment> {
+}: PreviewEnvironmentDeploymentStatusPayload): Promise<PreviewEnvironmentDeploymentStatus> {
   const { data } = await axios.post(
-    `${process.env['ZONKE_API_ENDPOINT']}/preview-environment/revert`,
+    `${process.env['ZONKE_API_ENDPOINT']}/preview-environment/deploy-version`,
     {
       environmentId,
       sourceVersion,
@@ -183,4 +208,21 @@ export async function revertPreviewEnvironmentToVersion({
   );
 
   return data;
+}
+
+export async function deletePreviewEnvironment(environmentId: string): Promise<void> {
+  await axios.post(
+    `${process.env['ZONKE_API_ENDPOINT']}/preview-environment/delete`,
+    {
+      environmentId,
+    },
+    {
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'x-zonke-api-key': process.env['ZONKE_API_KEY'],
+        'x-zonke-api-token': process.env['ZONKE_API_TOKEN'],
+      },
+    },
+  );
 }

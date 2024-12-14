@@ -8,6 +8,11 @@ export interface PreviewEnvironmentVersion {
   versionId: string;
 
   /**
+   * Short message that describes the change in the version. Think of this as a GIT commit message.
+   */
+  message?: string;
+
+  /**
    * Whether this is the most recent version of the preview environment.
    */
   isLatest: boolean;
@@ -74,4 +79,9 @@ export interface PreviewEnvironmentDeploymentStatus {
    * Leaving this field as a string instead of an enum to allow for non-breaking future changes.
    */
   status: string;
+
+  /**
+   * The error message if the deployment failed.
+   */
+  error?: string;
 }

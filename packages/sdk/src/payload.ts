@@ -2,7 +2,6 @@ export enum SupportedFrameworks {
   React = 'react',
   Remix = 'remix',
   NextJs = 'nextjs',
-  Gatsby = 'gatsby',
 }
 
 
@@ -33,12 +32,7 @@ export interface DeployToPreviewEnvironmentPayload {
   environmentId: string;
 
   /**
-   * The number of seconds the deployment endpoint will be active for. Default is 60 seconds.
-   */
-  uploadLinkExpirationOverride?: number;
-
-  /**
-   * The build directory that the preview environment will be built from. These directory will be zipped and
+   * The build directory that the preview environment will be built from. This directory will be zipped and
    * deployed to the preview environment. Expected directories:
    *    - Next.js standalone - `.next`
    *    - Next.js export vite - `dist`
@@ -47,6 +41,16 @@ export interface DeployToPreviewEnvironmentPayload {
    *    - React static webpack - `out`
    */
   buildOutputDirectory: string;
+
+  /**
+   * The number of seconds the deployment endpoint will be active for. Default is 60 seconds.
+   */
+  uploadLinkExpirationOverride?: number;
+
+  /**
+   * Short message that describes the change in the version. Think of this as a GIT commit message.
+   */
+  message?: string;
 }
 
 
