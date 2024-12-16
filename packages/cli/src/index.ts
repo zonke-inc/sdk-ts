@@ -38,10 +38,17 @@ export function cli() {
         buildOutputDirectory: await input({ message: 'Build output path: ' }),
       };
 
+      const frameworkEnum = framework as SupportedFrameworks;
+      let packageJsonPath: string | undefined = undefined;
+      if (frameworkEnum === SupportedFrameworks.Remix) {
+        packageJsonPath = await input({ message: 'Path to package.json: ' });
+      }
+
       upsertConfigFile({
         awsHostedZone,
+        packageJsonPath,
         buildOutputDirectory,
-        framework: framework as SupportedFrameworks,
+        framework: frameworkEnum,
       });
     });
 
@@ -54,7 +61,7 @@ export function cli() {
       await oraPromise(deploy(message, version), {
         text: 'Triggering environment deployment...',
         failText: 'Deployment failed',
-        successText: 'Deployment successful',
+        successText: 'Deployment triggered successfully',
       });
     });
 

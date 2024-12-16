@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs-extra';
+import { cpSync, existsSync, readFileSync, writeFileSync } from 'fs-extra';
+import { join } from 'path';
 
 import {
   createPreviewEnvironment,
@@ -7,6 +8,7 @@ import {
   getDeploymentStatus,
   revertPreviewEnvironmentToVersion,
   PreviewEnvironmentVersion,
+  SupportedFrameworks,
 } from '@zonke-cloud/sdk';
 
 import {
@@ -30,6 +32,14 @@ export async function deploy(message: string, sourceVersion: string): Promise<vo
     const environment = await createPreviewEnvironment(config);
     upsertConfigFile({ ...config, environment });
     config.environment = environment;
+  }
+
+  if (config.packageJsonPath && config.framework === SupportedFrameworks.Remix) {
+    if (!existsSync(join(config.buildOutputDirectory, 'server'))) {
+      throw new Error('Server build output directory does not exist.');
+    }
+
+    cpSync(config.packageJsonPath, join(config.buildOutputDirectory, 'server', 'package.json'));
   }
 
   let version: PreviewEnvironmentVersion;
@@ -117,6 +127,7 @@ export function upsertConfigFile({
   framework,
   environment,
   awsHostedZone,
+  packageJsonPath,
   buildOutputDirectory,
 }: Project): void {
   if (!existsSync(CONFIG_FILE)) {
@@ -124,6 +135,7 @@ export function upsertConfigFile({
       framework,
       environment,
       awsHostedZone,
+      packageJsonPath,
       buildOutputDirectory,
     }, null, 2));
     writeFileSync('.gitignore', `\n${CONFIG_FILE}`, { flag: 'a' });

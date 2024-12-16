@@ -23,4 +23,9 @@ export interface Project {
    * deployed to the preview environment.
    */
   buildOutputDirectory: string;
+
+  /**
+   * The path to the package.json file.
+   */
+  packageJsonPath?: string;
 }
