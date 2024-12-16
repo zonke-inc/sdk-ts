@@ -26,6 +26,12 @@ export interface Project {
 
   /**
    * The path to the package.json file.
+   * 
+   * Remix's server build does not include node modules. This path is used to copy the package.json file to the server
+   * build output directory so we can install required dependencies during the deployment. We are making a trade-off
+   * here between the size of the deployment package and the time it takes to install dependencies during deployment.
+   * Node modules combined with build package versioning can easily blow up S3 storage costs, so we are opting to 
+   * install dependencies during deployment.
    */
   packageJsonPath?: string;
 }
