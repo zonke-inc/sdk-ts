@@ -85,3 +85,21 @@ export interface PreviewEnvironmentDeploymentStatus {
    */
   error?: string;
 }
+
+
+export interface PreviewEnvironmentClientProps {
+  /**
+   * API key used to authenticate with the Zonke API.
+   */
+  apiKey: string;
+
+  /**
+   * API token used to authenticate with the Zonke API.
+   */
+  apiToken: string;
+
+  /**
+   * Zonke API base URL. The production endpoint is https://zonke.dev/api/rest.
+   */
+  apiEndpoint: string;
+}
