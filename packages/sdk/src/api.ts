@@ -3,12 +3,12 @@ import { cpSync, mkdtempSync, rmSync } from 'fs-extra';
 import { tmpdir } from 'os';
 import { basename, join, resolve } from 'path';
 
-import {
+import type {
   PreviewEnvironment,
   PreviewEnvironmentDeploymentStatus,
   PreviewEnvironmentVersion,
 } from './model';
-import {
+import type {
   CreatePreviewEnvironmentPayload,
   DeployToPreviewEnvironmentPayload,
   PreviewEnvironmentDeploymentStatusPayload,
@@ -210,8 +210,8 @@ export async function revertPreviewEnvironmentToVersion({
   return data;
 }
 
-export async function deletePreviewEnvironment(environmentId: string): Promise<void> {
-  await axios.post(
+export async function deletePreviewEnvironment(environmentId: string): Promise<boolean> {
+  const { data } = await axios.post(
     `${process.env['ZONKE_API_ENDPOINT']}/preview-environment/delete`,
     {
       environmentId,
@@ -225,4 +225,6 @@ export async function deletePreviewEnvironment(environmentId: string): Promise<v
       },
     },
   );
+
+  return data;
 }
