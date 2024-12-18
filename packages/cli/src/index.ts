@@ -38,15 +38,19 @@ export function cli() {
         buildOutputDirectory: await input({ message: 'Build output path: ' }),
       };
 
-      const frameworkEnum = framework as SupportedFrameworks;
       let packageJsonPath: string | undefined = undefined;
+      let publicDirectory: string | undefined = undefined;
+      const frameworkEnum = framework as SupportedFrameworks;
       if (frameworkEnum === SupportedFrameworks.Remix) {
         packageJsonPath = await input({ message: 'Path to package.json: ' });
+      } else if (frameworkEnum === SupportedFrameworks.NextJs) {
+        publicDirectory = await input({ message: 'Path to public directory: ' });
       }
 
       upsertConfigFile({
         awsHostedZone,
         packageJsonPath,
+        publicDirectory,
         buildOutputDirectory,
         framework: frameworkEnum,
       });

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { cpSync, mkdtempSync, rmSync } from 'fs-extra';
+import { cpSync, existsSync, mkdtempSync, rmSync } from 'fs-extra';
 import { tmpdir } from 'os';
 import { basename, join, resolve } from 'path';
 
@@ -9,10 +9,11 @@ import type {
   PreviewEnvironmentDeploymentStatus,
   PreviewEnvironmentVersion,
 } from './model';
-import type {
-  CreatePreviewEnvironmentPayload,
-  DeployToPreviewEnvironmentPayload,
-  PreviewEnvironmentDeploymentStatusPayload,
+import {
+  type CreatePreviewEnvironmentPayload,
+  type DeployToPreviewEnvironmentPayload,
+  type PreviewEnvironmentDeploymentStatusPayload,
+  type RevertPreviewEnvironmentToVersionPayload,
 } from './payload';
 import {  zipDirectory } from './util';
 
@@ -77,6 +78,7 @@ export class PreviewEnvironmentClient {
   async deployToPreviewEnvironment({
     message,
     environmentId,
+    publicDirectory,
     buildOutputDirectory,
     uploadLinkExpirationOverride,
   }: DeployToPreviewEnvironmentPayload): Promise<PreviewEnvironmentVersion> {
@@ -103,6 +105,11 @@ export class PreviewEnvironmentClient {
     cpSync(buildOutputDirectory, join(outDirectory, basename(resolve(buildOutputDirectory))), {
       recursive: true,
     });
+    if (publicDirectory && existsSync(publicDirectory)) {
+      cpSync(publicDirectory, join(outDirectory, 'public'), {
+        recursive: true,
+      });
+    }
 
     const zipFileBuffer = await zipDirectory(outDirectory);
 
@@ -218,7 +225,7 @@ export class PreviewEnvironmentClient {
   async revertPreviewEnvironmentToVersion({
     environmentId,
     sourceVersion,
-  }: PreviewEnvironmentDeploymentStatusPayload): Promise<PreviewEnvironmentDeploymentStatus> {
+  }: RevertPreviewEnvironmentToVersionPayload): Promise<PreviewEnvironmentDeploymentStatus> {
     const { data } = await axios.post(
       `${this.apiEndpoint}/preview-environment/deploy-version`,
       {

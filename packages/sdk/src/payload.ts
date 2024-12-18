@@ -32,18 +32,19 @@ export interface DeployToPreviewEnvironmentPayload {
   environmentId: string;
 
   /**
-   * The build directory that the preview environment will be built from. This directory will be zipped and
-   * deployed to the preview environment. Expected directories:
+   * The build directory that will be deployed to the preview environment. Expected directories:
    *    - Next.js standalone - `.next`
    *    - Next.js export vite - `dist`
    *    - Next.js export webpack - `out`
    *    - React static vite - `dist`
    *    - React static webpack - `out`
+   *    - Remix - `build` with `build/client` and `build/server` subfolders.
    */
   buildOutputDirectory: string;
 
   /**
    * The number of seconds the deployment endpoint will be active for. Default is 60 seconds.
+   * Increase this value if you need more time to upload the build output directory.
    */
   uploadLinkExpirationOverride?: number;
 
@@ -51,6 +52,11 @@ export interface DeployToPreviewEnvironmentPayload {
    * Short message that describes the change in the version. Think of this as a GIT commit message.
    */
   message?: string;
+
+  /**
+   * Path to the public (static files) directory of the project. This is only required for Next.js projects.
+   */
+  publicDirectory?: string;
 }
 
 

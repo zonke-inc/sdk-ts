@@ -123,6 +123,7 @@ export function upsertConfigFile({
   framework,
   environment,
   awsHostedZone,
+  publicDirectory,
   packageJsonPath,
   buildOutputDirectory,
 }: Project): void {
@@ -132,6 +133,7 @@ export function upsertConfigFile({
       environment,
       awsHostedZone,
       packageJsonPath,
+      publicDirectory,
       buildOutputDirectory,
     }, null, 2));
     writeFileSync('.gitignore', `\n${CONFIG_FILE}`, { flag: 'a' });
@@ -152,7 +154,7 @@ export async function createCredentials({
     ENV_FILE,
     `ZONKE_API_KEY=${apiKey}\nZONKE_API_TOKEN=${apiToken}\nZONKE_API_ENDPOINT=${API_ENDPOINT}\n`,
   );
-  writeFileSync('.gitignore', ENV_FILE, { flag: 'a' });
+  writeFileSync('.gitignore', `\n${ENV_FILE}`, { flag: 'a' });
 }
 
 function getClient(): PreviewEnvironmentClient {

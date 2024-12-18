@@ -34,4 +34,9 @@ export interface Project {
    * install dependencies during deployment.
    */
   packageJsonPath?: string;
+
+  /**
+   * The path to the public (static files) directory of the project. This is only required for Next.js projects.
+   */
+  publicDirectory?: string;
 }
