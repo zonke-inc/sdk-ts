@@ -2,11 +2,7 @@ import { cpSync, existsSync, readFileSync, writeFileSync } from 'fs-extra';
 import { join } from 'path';
 
 import {
-  createPreviewEnvironment,
-  deletePreviewEnvironment,
-  deployToPreviewEnvironment,
-  getDeploymentStatus,
-  revertPreviewEnvironmentToVersion,
+  PreviewEnvironmentClient,
   PreviewEnvironmentVersion,
   SupportedFrameworks,
 } from '@zonke-cloud/sdk';
@@ -25,11 +21,11 @@ import {
 let projectConfig: Project | undefined = undefined;
 
 export async function deploy(message: string, sourceVersion: string): Promise<void> {
-  exportCredentials();
+  const client = getClient();
 
   const config = getProjectConfig();
   if (!config.environment) {
-    const environment = await createPreviewEnvironment(config);
+    const environment = await client.createPreviewEnvironment(config);
     upsertConfigFile({ ...config, environment });
     config.environment = environment;
   }
@@ -49,7 +45,7 @@ export async function deploy(message: string, sourceVersion: string): Promise<vo
       throw new Error(`The specified source version '${sourceVersion}' does not exist.`);
     }
 
-    const status = await revertPreviewEnvironmentToVersion({
+    const status = await client.revertPreviewEnvironmentToVersion({
       sourceVersion,
       environmentId: config.environment!.environmentId,
     });
@@ -63,7 +59,7 @@ export async function deploy(message: string, sourceVersion: string): Promise<vo
     };
 
   } else {
-    version = await deployToPreviewEnvironment({
+    version = await client.deployToPreviewEnvironment({
       message,
       environmentId: config.environment!.environmentId,
       buildOutputDirectory: config.buildOutputDirectory,
@@ -81,7 +77,7 @@ export async function deploy(message: string, sourceVersion: string): Promise<vo
 }
 
 export async function status(): Promise<void> {
-  exportCredentials();
+  const client = getClient();
 
   const config = getProjectConfig();
   if (!config.environment || !config.environment.versions.length) {
@@ -89,7 +85,7 @@ export async function status(): Promise<void> {
   }
 
   const sourceVersion = config.environment.versions.find((version) => version.isLatest)!.versionId;
-  const { status, error } = await getDeploymentStatus({
+  const { status, error } = await client.getDeploymentStatus({
     sourceVersion,
     environmentId: config.environment.environmentId,
   });
@@ -108,7 +104,7 @@ export async function status(): Promise<void> {
 }
 
 export async function deleteEnvironment(): Promise<void> {
-  exportCredentials();
+  const client = getClient();
 
   const config = getProjectConfig();
   if (!config.environment) {
@@ -116,7 +112,7 @@ export async function deleteEnvironment(): Promise<void> {
     return;
   }
 
-  await deletePreviewEnvironment(config.environment.environmentId);
+  await client.deletePreviewEnvironment(config.environment.environmentId);
   upsertConfigFile({
     ...config,
     environment: undefined,
@@ -159,7 +155,7 @@ export async function createCredentials({
   writeFileSync('.gitignore', ENV_FILE, { flag: 'a' });
 }
 
-function exportCredentials(): void {
+function getClient(): PreviewEnvironmentClient {
   if (!existsSync(ENV_FILE)) {
     throw new Error('Credentials file does not exist. Run `npx @zonke-cloud/cli init` to create it.');
   }
@@ -167,6 +163,12 @@ function exportCredentials(): void {
   if (!process.env['ZONKE_API_KEY'] || !process.env['ZONKE_API_TOKEN']) {
     process.loadEnvFile(ENV_FILE);
   }
+
+  return new PreviewEnvironmentClient({
+    apiKey: process.env['ZONKE_API_KEY']!,
+    apiToken: process.env['ZONKE_API_TOKEN']!,
+    apiEndpoint: process.env['ZONKE_API_ENDPOINT']!,
+  });
 }
 
 function getProjectConfig(): Project {

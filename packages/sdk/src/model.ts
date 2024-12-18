@@ -75,10 +75,9 @@ export interface PreviewEnvironmentDeploymentStatus {
   sourceVersion: string;
 
   /**
-   * The status of the environment deployment. Options are "SCHEDULED", "IN_PROGRESS", "SUCCEEDED", or "FAILED".
-   * Leaving this field as a string instead of an enum to allow for non-breaking future changes.
+   * The status of the environment deployment.
    */
-  status: string;
+  status: 'SCHEDULED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILED';
 
   /**
    * The error message if the deployment failed.

@@ -58,7 +58,9 @@ export class PreviewEnvironmentClient {
           'Content-Type': 'application/json',
         },
       },
-    );
+    ).catch((error) => {
+      throw new Error(error.response.data.message);
+    });
 
     return data;
   }
@@ -92,7 +94,9 @@ export class PreviewEnvironmentClient {
           'Content-Type': 'application/json',
         },
       },
-    );
+    ).catch((error) => {
+      throw new Error(error.response.data.message);
+    });
 
     // Copy the build output directory to a temporary directory to preserve the original directory name.
     const outDirectory = mkdtempSync(join(tmpdir(), 'zip-'));
@@ -111,7 +115,9 @@ export class PreviewEnvironmentClient {
           'Content-Length': zipFileBuffer.length,
         },
       },
-    );
+    ).catch((error) => {
+      throw new Error(error.response.data.message);
+    });
 
     rmSync(outDirectory, {
       recursive: true,
@@ -142,7 +148,9 @@ export class PreviewEnvironmentClient {
             'Content-Type': 'application/json',
           },
         },
-      );
+      ).catch((error) => {
+        throw new Error(error.response.data.message);
+      });
     }
 
     return version;
@@ -166,7 +174,9 @@ export class PreviewEnvironmentClient {
           'Content-Type': 'application/json',
         },
       },
-    );
+    ).catch((error) => {
+      throw new Error(error.response.data.message);
+    });
 
     return data;
   }
@@ -193,7 +203,9 @@ export class PreviewEnvironmentClient {
           'Content-Type': 'application/json',
         },
       },
-    );
+    ).catch((error) => {
+      throw new Error(error.response.data.message);
+    });
 
     return data;
   }
@@ -221,11 +233,18 @@ export class PreviewEnvironmentClient {
           'Content-Type': 'application/json',
         },
       },
-    );
+    ).catch((error) => {
+      throw new Error(error.response.data.message);
+    });
 
     return data;
   }
 
+  /**
+   * Deletes a preview environment. This will delete all versions of the preview environment as well.
+   * 
+   * @returns True if the preview environment was deleted successfully.
+   */
   async deletePreviewEnvironment(environmentId: string): Promise<boolean> {
     const { data } = await axios.post(
       `${this.apiEndpoint}/preview-environment/delete`,
@@ -240,7 +259,9 @@ export class PreviewEnvironmentClient {
           'Content-Type': 'application/json',
         },
       },
-    );
+    ).catch((error) => {
+      throw new Error(error.response.data.message);
+    });
 
     return data;
   }

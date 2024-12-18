@@ -1,6 +1,6 @@
 {
   "name": "@zonke-cloud/sdk",
-  "version": "0.1.2",
+  "version": "0.1.5",
   "description": "Thin wrapper around Zonké infrastructure management API",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

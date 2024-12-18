@@ -12,8 +12,8 @@ importers:
         specifier: ^7.2.0
         version: 7.2.0(@types/node@22.10.2)
       '@zonke-cloud/sdk':
-        specifier: ^0.1.2
-        version: 0.1.2
+        specifier: ^0.1.5
+        version: 0.1.5
       commander:
         specifier: ^12.1.0
         version: 12.1.0
@@ -269,8 +269,8 @@ packages:
   '@types/node@22.10.2':
     resolution: {integrity: sha512-Xxr6BBRCAOQixvonOye19wnzyDiUtTeqldOOmj3CkeblonbccA12PFwlufvRdrpjXxqnmUaeiU5EOA+7s5diUQ==}
 
-  '@zonke-cloud/sdk@0.1.2':
-    resolution: {integrity: sha512-Td2jPuKFzwB5qTIzUpHT//qgp5p0yvFov4drll6MZl3ENdMQtOBABZqks0MBd7eGBjOKUirC0cOwYMhCSgCbhg==}
+  '@zonke-cloud/sdk@0.1.5':
+    resolution: {integrity: sha512-GK4ztS0dlOAyQZRBLWJpghk2226ZMWudlBN0RyCE8s6UnAtSb+fcPOA4oM9d173y6FbRCaEiBJ3PsWc+COh48w==}
 
   ansi-escapes@4.3.2:
     resolution: {integrity: sha512-gKXj5ALrKWQLsYG9jlTRmR/xKluxHV+Z9QEwNIgCfM1/uwPMCuzVVnh5mwTd+OuBZcwSIMbqssNWRm1lE51QaQ==}
@@ -720,7 +720,7 @@ snapshots:
     dependencies:
       undici-types: 6.20.0
 
-  '@zonke-cloud/sdk@0.1.2':
+  '@zonke-cloud/sdk@0.1.5':
     dependencies:
       axios: 1.7.9
       fs-extra: 11.2.0
