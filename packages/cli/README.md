@@ -56,7 +56,7 @@ zonke delete-environment
 
 ## Monitor Deployments
 ### Build Times
-![View build stats on dashboard](../../assets/dashboard-build-stats.png)
+![View build stats on dashboard](https://raw.githubusercontent.com/zonke-inc/sdk-ts/refs/heads/main/assets/dashboard-build-stats.png)
 
 ### Build History
-![View build history on dashboard](../../assets/dashboard-build-history.png)
+![View build history on dashboard](https://raw.githubusercontent.com/zonke-inc/sdk-ts/refs/heads/main/assets/dashboard-build-history.png)
