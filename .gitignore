@@ -133,3 +133,4 @@ build/
 .env.zonke
 zonke.config.json
 .DS_Store
+.open-dash

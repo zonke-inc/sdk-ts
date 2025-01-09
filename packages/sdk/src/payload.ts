@@ -1,4 +1,5 @@
 export enum SupportedFrameworks {
+  Dash = 'dash',
   React = 'react',
   Remix = 'remix',
   NextJs = 'nextjs',

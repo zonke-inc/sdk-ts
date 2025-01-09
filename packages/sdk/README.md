@@ -31,6 +31,7 @@ const nextConfig = {
 #### Build Folder by Framework
 Each environment specifies a dedicated build output folder that the SDK zips and deploys. These are the expected folders for each framework:
 
+- Dash - `.open-dash` folder output by the [open-dash](https://pypi.org/project/open-dash/) CLI. Make sure the `.open-dash/static` folder exists.
 - Next.js:
   - `export` - `out` or `dist`, depending on build tool.
   - `standalone` - `.next`. Make sure the `.next/standalone` folder exists.

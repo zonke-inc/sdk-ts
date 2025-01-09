@@ -39,6 +39,7 @@ const nextConfig = {
 #### Build Folder by Framework
 Each environment specifies a dedicated build output folder that the CLI zips and deploys. These are the expected folders for each framework:
 
+- Dash - The source folder with your Dash `app.py` file. The CLI internally calls `open-dash` to build static assets.
 - Next.js:
   - `export` - `out` or `dist`, depending on build tool.
   - `standalone` - `.next`. Make sure the `.next/standalone` folder exists.

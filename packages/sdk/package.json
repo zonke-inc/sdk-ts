@@ -1,7 +1,7 @@
 {
   "name": "@zonke-cloud/sdk",
-  "version": "0.1.6",
-  "description": "Thin wrapper around Zonké infrastructure management API",
+  "version": "0.1.8",
+  "description": "Zonké infrastructure management SDK. Deploy and manage AWS infrastructure with Zonké.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
