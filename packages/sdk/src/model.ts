@@ -45,6 +45,7 @@ export interface PreviewEnvironment {
   versions: PreviewEnvironmentVersion[];
 }
 
+
 /**
  * A signed URL you can use to deploy to a preview environment.
  */
@@ -56,9 +57,23 @@ export interface PreviewEnvironmentDeploymentEndpoint {
 
   /**
    * The signed URL you can use to deploy to the preview environment.
+   * 
+   * NOTE: This endpoint will be phased out in the future in favor of the `presignedStaticDeploymentEndpoint` and
+   * `presignedSsrDeploymentEndpoint` endpoints.
    */
   presignedDeploymentEndpoint: string;
+
+  /**
+   * A signed URL you can use to deploy the server-side rendering function to the preview environment.
+   */
+  presignedServerDeploymentEndpoint?: string;
+
+  /**
+   * A signed URL you can use to deploy static files to the preview environment.
+   */
+  presignedClientDeploymentEndpoint?: string;
 }
+
 
 /**
  * The status of a preview environment deployment.
@@ -101,4 +116,22 @@ export interface PreviewEnvironmentClientProps {
    * Zonke API base URL. The production endpoint is https://zonke.dev/api/rest.
    */
   apiEndpoint: string;
+}
+
+
+export interface PreviewEnvironmentDeploymentDirectoryMetadata {
+  /**
+   * Whether the client deployment directory contains an index.html file.
+   */
+  hasIndexHtml: boolean;
+  
+  /**
+   * The path to the client deployment directory.
+   */
+  clientDirectory: string;
+
+  /**
+   * The path to the server deployment directory.
+   */
+  serverDirectory?: string;
 }

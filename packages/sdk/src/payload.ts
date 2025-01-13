@@ -44,6 +44,11 @@ export interface DeployToPreviewEnvironmentPayload {
   buildOutputDirectory: string;
 
   /**
+   * The framework used to build the project.
+   */
+  framework: SupportedFrameworks;
+
+  /**
    * The number of seconds the deployment endpoint will be active for. Default is 60 seconds.
    * Increase this value if you need more time to upload the build output directory.
    */

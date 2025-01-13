@@ -10,8 +10,8 @@ import {
   createCredentials,
   deleteEnvironment,
   deploy,
+  initializeEnvironment,
   status,
-  upsertConfigFile,
 } from './commands';
 
 
@@ -47,7 +47,7 @@ export function cli() {
         publicDirectory = await input({ message: 'Path to public directory: ' });
       }
 
-      upsertConfigFile({
+      await initializeEnvironment({
         awsHostedZone,
         packageJsonPath,
         publicDirectory,

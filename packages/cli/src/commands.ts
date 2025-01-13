@@ -1,5 +1,4 @@
-import { sync } from 'cross-spawn';
-import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'fs-extra';
+import { cpSync, existsSync, readFileSync, writeFileSync } from 'fs-extra';
 import { join, resolve } from 'path';
 
 import {
@@ -31,17 +30,13 @@ export async function deploy(message: string, sourceVersion: string): Promise<vo
     config.environment = environment;
   }
 
-  let buildOutputDirectory = config.buildOutputDirectory;
+  let buildOutputDirectory = resolve(config.buildOutputDirectory);
   if (config.packageJsonPath && config.framework === SupportedFrameworks.Remix) {
     if (!existsSync(join(config.buildOutputDirectory, 'server'))) {
       throw new Error('Server build output directory does not exist.');
     }
 
     cpSync(config.packageJsonPath, join(config.buildOutputDirectory, 'server', 'package.json'));
-  } else if (config.framework === SupportedFrameworks.Dash) {
-    buildDashApp(resolve(config.buildOutputDirectory));
-
-    buildOutputDirectory = resolve(join(config.buildOutputDirectory, '..', '.open-dash'));
   }
 
   let version: PreviewEnvironmentVersion;
@@ -68,6 +63,7 @@ export async function deploy(message: string, sourceVersion: string): Promise<vo
     version = await client.deployToPreviewEnvironment({
       message,
       buildOutputDirectory,
+      framework: config.framework,
       environmentId: config.environment!.environmentId,
     });
   }
@@ -152,6 +148,13 @@ export function upsertConfigFile({
   }
 }
 
+export async function initializeEnvironment(project: Project): Promise<void> {
+  const client = getClient();
+
+  const environment = await client.createPreviewEnvironment(project);
+  upsertConfigFile({ ...project, environment });
+}
+
 export async function createCredentials({
   apiKey,
   apiToken,
@@ -189,59 +192,4 @@ function getProjectConfig(): Project {
   }
 
   return projectConfig!;
-}
-
-function buildDashApp(sourcePath: string): void {
-  const sourceParent = join(sourcePath, '..');
-  const venvPath = resolve(join(sourceParent, '.venv-open-dash'));
-  try {
-    const defaultConfig = {
-      'warmer': false,
-      'venv-path': venvPath,
-      'export-static': true,
-      'source-path': sourcePath,
-      'excluded-directories': [],
-      'target-base-path': sourceParent,
-      'fingerprint': {
-        'version': true,
-        'method': 'last-modified'
-      }
-    };
-
-    writeFileSync(join(sourcePath, 'open-dash.config.json'), JSON.stringify(defaultConfig, null, 2));
-    runCommand('python3 -m venv .venv-open-dash', sourceParent, process.env);
-    runCommand(
-      `${join('bin', 'pip3')} install open-dash`,
-      venvPath,
-      process.env,
-    );
-    runCommand(
-      `${join(venvPath, 'bin', 'open-dash')} bundle --config-path=open-dash.config.json`,
-      sourcePath,
-      process.env,
-    );
-  } finally {
-    if (existsSync(venvPath)) {
-      rmSync(venvPath, { recursive: true });
-    }
-    
-    if (existsSync(join(sourcePath, 'open-dash.config.json'))) {
-      rmSync(join(sourcePath, 'open-dash.config.json'));
-    }
-  }
-}
-
-function runCommand(command: string, cwd: string, env: NodeJS.ProcessEnv | undefined) {
-  console.debug(`├ Running '${command}' in`, cwd);
-  const commandParts = command.split(/\s+/);
-  const result = sync(commandParts[0], commandParts.slice(1), {
-    env,
-    cwd,
-    shell: true,
-    stdio: 'inherit',
-  });
-
-  if (result.status !== 0) {
-    throw new Error(`Command '${command}' for application failed.`);
-  }
 }

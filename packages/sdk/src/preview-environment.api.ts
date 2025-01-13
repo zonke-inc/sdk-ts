@@ -6,16 +6,22 @@ import { basename, join, resolve } from 'path';
 import type {
   PreviewEnvironment,
   PreviewEnvironmentClientProps,
+  PreviewEnvironmentDeploymentDirectoryMetadata,
   PreviewEnvironmentDeploymentStatus,
   PreviewEnvironmentVersion,
 } from './model';
 import {
+  SupportedFrameworks,
   type CreatePreviewEnvironmentPayload,
   type DeployToPreviewEnvironmentPayload,
   type PreviewEnvironmentDeploymentStatusPayload,
   type RevertPreviewEnvironmentToVersionPayload,
 } from './payload';
-import {  zipDirectory } from './util';
+import {
+  deployDirectoryToS3,
+  prepareNextJsDeployment,
+  prepareRemixDeployment,
+} from './util';
 
 
 export class PreviewEnvironmentClient {
@@ -33,6 +39,7 @@ export class PreviewEnvironmentClient {
     this.apiEndpoint = apiEndpoint;
   }
 
+  
   /**
    * Calls the Zonké API to create a preview environment. Note that this only defines the preview environment,
    * it does not deploy any code to it. To deploy code to the preview environment, use `deployToPreviewEnvironment`.
@@ -77,6 +84,7 @@ export class PreviewEnvironmentClient {
    */
   async deployToPreviewEnvironment({
     message,
+    framework,
     environmentId,
     publicDirectory,
     buildOutputDirectory,
@@ -85,6 +93,7 @@ export class PreviewEnvironmentClient {
     const { data } = await axios.post(
       `${this.apiEndpoint}/preview-environment/deployment-endpoint`,
       {
+        message,
         environmentId,
         expiresIn: uploadLinkExpirationOverride || 60,
       },
@@ -100,67 +109,32 @@ export class PreviewEnvironmentClient {
       throw new Error(error.response.data.message);
     });
 
-    // Copy the build output directory to a temporary directory to preserve the original directory name.
-    const outDirectory = mkdtempSync(join(tmpdir(), 'zip-'));
-    cpSync(buildOutputDirectory, join(outDirectory, basename(resolve(buildOutputDirectory))), {
-      recursive: true,
-    });
-    if (publicDirectory && existsSync(publicDirectory)) {
-      cpSync(publicDirectory, join(outDirectory, 'public'), {
-        recursive: true,
+    const {
+      sourceVersion,
+      presignedDeploymentEndpoint,
+      presignedClientDeploymentEndpoint,
+      presignedServerDeploymentEndpoint,
+    } = data;
+
+    if (presignedClientDeploymentEndpoint && presignedServerDeploymentEndpoint) {
+      return this.deploySplitClientServerBundles({
+        message,
+        framework,
+        environmentId,
+        sourceVersion,
+        buildOutputDirectory,
+        presignedClientDeploymentEndpoint,
+        presignedServerDeploymentEndpoint,
       });
     }
 
-    const zipFileBuffer = await zipDirectory(outDirectory);
-
-    const { headers } = await axios.put(
-      data.presignedDeploymentEndpoint,
-      zipFileBuffer,
-      {
-        headers: {
-          'Content-Type': 'application/zip',
-          'Content-Length': zipFileBuffer.length,
-        },
-      },
-    ).catch((error) => {
-      throw new Error(error.response.data.message);
-    });
-
-    rmSync(outDirectory, {
-      recursive: true,
-    });
-
-    const version: PreviewEnvironmentVersion = {
+    return this.deployCombinedClientServerBundle({
       message,
-      isLatest: true,
-      lastUpdated: new Date().toISOString(),
-      versionId: headers['x-amz-version-id'],
-    };
-
-    if (message) {
-      // A deployment tracker is not created in Zonké until after the code is uploaded to S3, so we have to set the 
-      // message after the deployment has been triggered.
-      await axios.post(
-        `${this.apiEndpoint}/preview-environment/set-deployment-message`,
-        {
-          message,
-          environmentId,
-          sourceVersion: version.versionId,
-        },
-        {
-          headers: {
-            Accept: 'application/json',
-            'x-zonke-api-key': this.apiKey,
-            'x-zonke-api-token': this.apiToken,
-            'Content-Type': 'application/json',
-          },
-        },
-      ).catch((error) => {
-        throw new Error(error.response.data.message);
-      });
-    }
-
-    return version;
+      environmentId,
+      publicDirectory,
+      buildOutputDirectory,
+      presignedDeploymentEndpoint,
+    });
   }
 
 
@@ -247,6 +221,7 @@ export class PreviewEnvironmentClient {
     return data;
   }
 
+
   /**
    * Deletes a preview environment. This will delete all versions of the preview environment as well.
    * 
@@ -271,5 +246,142 @@ export class PreviewEnvironmentClient {
     });
 
     return data;
+  }
+
+
+  private async deployCombinedClientServerBundle({
+    message,
+    environmentId,
+    publicDirectory,
+    buildOutputDirectory,
+    presignedDeploymentEndpoint,
+  }: {
+    environmentId: string;
+    buildOutputDirectory: string;
+    presignedDeploymentEndpoint: string;
+
+    message?: string;
+    publicDirectory?: string;
+  }): Promise<PreviewEnvironmentVersion> {
+    // Copy the build output directory to a temporary directory to preserve the original directory name.
+    const outDirectory = mkdtempSync(join(tmpdir(), 'zip-'));
+    cpSync(buildOutputDirectory, join(outDirectory, basename(resolve(buildOutputDirectory))), {
+      recursive: true,
+    });
+    if (publicDirectory && existsSync(publicDirectory)) {
+      cpSync(publicDirectory, join(outDirectory, 'public'), {
+        recursive: true,
+      });
+    }
+
+    const versionId = await deployDirectoryToS3(outDirectory, presignedDeploymentEndpoint);
+
+    rmSync(outDirectory, {
+      recursive: true,
+    });
+
+    const version: PreviewEnvironmentVersion = {
+      message,
+      versionId,
+      isLatest: true,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    if (message) {
+      // A deployment tracker is not created in Zonké until after the code is uploaded to S3, so we have to set the 
+      // message after the deployment has been triggered.
+      await axios.post(
+        `${this.apiEndpoint}/preview-environment/set-deployment-message`,
+        {
+          message,
+          environmentId,
+          sourceVersion: version.versionId,
+        },
+        {
+          headers: {
+            Accept: 'application/json',
+            'x-zonke-api-key': this.apiKey,
+            'x-zonke-api-token': this.apiToken,
+            'Content-Type': 'application/json',
+          },
+        },
+      ).catch((error) => {
+        throw new Error(error.response.data.message);
+      });
+    }
+
+    return version;
+  }
+
+
+  private async deploySplitClientServerBundles({
+    message,
+    framework,
+    environmentId,
+    sourceVersion,
+    buildOutputDirectory,
+    presignedClientDeploymentEndpoint,
+    presignedServerDeploymentEndpoint,
+  }: {
+    environmentId: string;
+    sourceVersion: string;
+    buildOutputDirectory: string;
+    framework: SupportedFrameworks;
+    presignedClientDeploymentEndpoint: string;
+    presignedServerDeploymentEndpoint: string;
+
+    message?: string;
+  }): Promise<PreviewEnvironmentVersion> {
+    let directoryMetadata: PreviewEnvironmentDeploymentDirectoryMetadata = {
+      hasIndexHtml: false,
+      clientDirectory: buildOutputDirectory,
+    };
+
+    if (framework === SupportedFrameworks.NextJs && basename(buildOutputDirectory) === '.next') {
+      directoryMetadata = prepareNextJsDeployment(buildOutputDirectory);
+    } else if (framework === SupportedFrameworks.Remix) {
+      directoryMetadata = prepareRemixDeployment(buildOutputDirectory);
+    }
+
+    let serverVersion: string | undefined = undefined;
+    if (directoryMetadata.serverDirectory) {
+      serverVersion = await deployDirectoryToS3(
+        directoryMetadata.serverDirectory,
+        presignedServerDeploymentEndpoint,
+      );
+    }
+
+    const clientVersion = await deployDirectoryToS3(
+      directoryMetadata.clientDirectory,
+      presignedClientDeploymentEndpoint,
+    );
+    
+    await axios.post(
+      `${this.apiEndpoint}/preview-environment/complete-deployment`,
+      {
+        environmentId,
+        serverVersion,
+        clientVersion,
+        sourceVersion,
+        hasIndexHtml: directoryMetadata.hasIndexHtml,
+      },
+      {
+        headers: {
+          Accept: 'application/json',
+          'x-zonke-api-key': this.apiKey,
+          'x-zonke-api-token': this.apiToken,
+          'Content-Type': 'application/json',
+        },
+      },
+    ).catch((error) => {
+      throw new Error(error.response.data.message);
+    });
+
+    return {
+      message,
+      isLatest: true,
+      versionId: sourceVersion,
+      lastUpdated: new Date().toISOString(),
+    };
   }
 }
