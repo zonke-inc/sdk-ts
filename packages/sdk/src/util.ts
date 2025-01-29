@@ -6,6 +6,7 @@ import {
   lstatSync,
   readdirSync,
   readFileSync,
+  readJsonSync,
   readlinkSync,
   rmSync,
   writeFileSync,
@@ -69,7 +70,7 @@ export function prepareNextJsDeployment(buildFolder: string): PreviewEnvironment
   const buildParentFolder = join(buildFolder, '..');
   cpSync(join(buildParentFolder, 'package.json'), join(buildParentFolder, 'package.json.bak'));
   try {
-    const packageJson = require(join(buildParentFolder, 'package.json'));
+    const packageJson = readJsonSync(join(buildParentFolder, 'package.json'));
     packageJson.scripts = {
       'build': 'exit 0',
     };
@@ -166,6 +167,68 @@ export function prepareRemixDeployment(buildFolder: string): PreviewEnvironmentD
     serverDirectory: serverPath,
     clientDirectory: join(buildFolder, 'client'),
   };
+}
+
+
+export function prepareAstroDeployment(buildFolder: string): PreviewEnvironmentDeploymentDirectoryMetadata {
+  // Prefer the bundled output of the custom Astro adapter when available.
+  let serverPath = join(buildFolder, 'lambda');
+
+  const metadataAdapterPath = join(buildFolder, 'zonke-adapter-metadata.json');
+  if (existsSync(join(buildFolder, 'server')) && !existsSync(metadataAdapterPath)) {
+    throw new Error(
+      'zonke-adapter-metadata.json is missing from output directory. Is the @zonke-cloud/astro-adapter defined in your Astro config?'
+    );
+  }
+  
+  if (existsSync(serverPath)) {
+    const metadata = readJsonSync(metadataAdapterPath);
+    writeFileSync(join(serverPath, '.npmrc'), 'node-linker=hoisted\nsymlink=false\n', { flag: 'w' });
+    writeFileSync(
+      join(serverPath, 'package.json'),
+      JSON.stringify({
+        'type': 'commonjs',
+        dependencies: metadata?.adapter?.externalPackageVersions ?? {},
+      }, null, 2),
+      { flag: 'w' },
+    );
+    runCommand('corepack enable pnpm', serverPath, {
+      ...process.env,
+      NODE_ENV: 'production',
+    });
+    runCommand(
+      'pnpm add @rollup/rollup-linux-arm64-gnu',
+      serverPath,
+      {
+        ...process.env,
+        NODE_ENV: 'production',
+      }
+    );
+  } else {
+    serverPath = join(buildFolder, 'server');
+    const metadata = readJsonSync(metadataAdapterPath); 
+
+    writeFileSync(join(serverPath, '.npmrc'), 'node-linker=hoisted\nsymlink=false\n', { flag: 'w' });
+    cpSync(join(metadata.astro.root, 'package.json'), join(serverPath, 'package.json'));
+    runCommand('npm install', serverPath, {
+      ...process.env,
+      NODE_ENV: 'production',
+    });
+  }
+
+  return {
+    serverDirectory: serverPath,
+    clientDirectory: join(buildFolder, 'client'),
+    hasIndexHtml: existsSync(join(buildFolder, 'client', 'index.html')),
+  };
+}
+
+
+export function isAstroSsrBuild(buildFolder: string): boolean {
+  return (
+    existsSync(join(buildFolder, 'lambda')) ||  // Exported by @zonke-cloud/astro-adapter.
+    existsSync(join(buildFolder, 'server'))
+  ) && existsSync(join(buildFolder, 'client'));
 }
 
 

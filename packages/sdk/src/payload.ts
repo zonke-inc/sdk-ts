@@ -1,5 +1,6 @@
 export enum SupportedFrameworks {
   Dash = 'dash',
+  Astro = 'astro',
   React = 'react',
   Remix = 'remix',
   NextJs = 'nextjs',
@@ -34,6 +35,8 @@ export interface DeployToPreviewEnvironmentPayload {
 
   /**
    * The build directory that will be deployed to the preview environment. Expected directories:
+   *    - Astro - `dist` with static files or `dist/client` and `dist/server` subfolders.
+   *    - Dash - Your Dash app directory. The SDK will build the app before deploying.
    *    - Next.js standalone - `.next`
    *    - Next.js export vite - `dist`
    *    - Next.js export webpack - `out`

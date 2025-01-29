@@ -7,6 +7,9 @@
     "build:sdk": "tsc -p packages/sdk",
     "build:cli": "tsc -p packages/cli"
   },
+  "workspaces": [
+    "packages/*"
+  ],
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/zonke-inc/sdk-ts.git"

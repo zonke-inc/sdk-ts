@@ -1,7 +1,8 @@
 {
-  "name": "@zonke-cloud/sdk",
-  "version": "0.1.9",
-  "description": "Zonké infrastructure management SDK. Deploy and manage AWS infrastructure with Zonké.",
+  "name": "@zonke-cloud/astro-adapter",
+  "version": "0.0.1",
+  "description": "Adapter for deploying Astro applications to AWS using Zonké.",
+  "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -13,15 +14,13 @@
   ],
   "repository": {
     "type": "git",
-    "directory": "packages/sdk",
+    "directory": "packages/astro-adapter",
     "url": "git+ssh://git@github.com/zonke-inc/sdk-ts.git"
   },
   "keywords": [
     "zonke",
-    "api",
-    "sdk",
-    "aws",
-    "cdk"
+    "withastro",
+    "astro-adapter"
   ],
   "author": {
     "name": "Zonké Inc",
@@ -32,16 +31,17 @@
     "url": "https://github.com/zonke-inc/sdk-ts/issues"
   },
   "homepage": "https://zonke.dev",
-  "devDependencies": {
-    "@types/cross-spawn": "^6.0.6",
-    "@types/fs-extra": "^11.0.4",
-    "tsup": "^8.3.5",
-    "typescript": "^5.7.2"
-  },
   "dependencies": {
-    "axios": "^1.7.9",
-    "cross-spawn": "^7.0.6",
-    "fs-extra": "^11.2.0",
-    "jszip": "^3.10.1"
+    "aws-lambda": "^1.0.7",
+    "esbuild": "^0.24.2",
+    "merge-anything": "^6.0.2"
+  },
+  "peerDependencies": {
+    "astro": ">=4"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "@types/aws-lambda": "^8.10.147"
   }
 }

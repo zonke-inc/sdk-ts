@@ -13,6 +13,7 @@ import {
   initializeEnvironment,
   status,
 } from './commands';
+import { Project } from './model';
 
 
 export function cli() {
@@ -47,12 +48,17 @@ export function cli() {
         publicDirectory = await input({ message: 'Path to public directory: ' });
       }
 
-      await initializeEnvironment({
+      const project: Project = {
         awsHostedZone,
         packageJsonPath,
         publicDirectory,
         buildOutputDirectory,
         framework: frameworkEnum,
+      };
+      await oraPromise(initializeEnvironment(project), {
+        text: 'Initializing environment...',
+        failText: 'Environment initialization failed',
+        successText: 'Environment initialized',
       });
     });
 

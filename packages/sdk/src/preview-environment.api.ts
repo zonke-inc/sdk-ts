@@ -19,6 +19,8 @@ import {
 } from './payload';
 import {
   deployDirectoryToS3,
+  isAstroSsrBuild,
+  prepareAstroDeployment,
   prepareNextJsDeployment,
   prepareRemixDeployment,
 } from './util';
@@ -333,7 +335,7 @@ export class PreviewEnvironmentClient {
     message?: string;
   }): Promise<PreviewEnvironmentVersion> {
     let directoryMetadata: PreviewEnvironmentDeploymentDirectoryMetadata = {
-      hasIndexHtml: false,
+      hasIndexHtml: true,
       clientDirectory: buildOutputDirectory,
     };
 
@@ -341,6 +343,8 @@ export class PreviewEnvironmentClient {
       directoryMetadata = prepareNextJsDeployment(buildOutputDirectory);
     } else if (framework === SupportedFrameworks.Remix) {
       directoryMetadata = prepareRemixDeployment(buildOutputDirectory);
+    } else if (framework === SupportedFrameworks.Astro && isAstroSsrBuild(buildOutputDirectory)) {
+      directoryMetadata = prepareAstroDeployment(buildOutputDirectory);
     }
 
     let serverVersion: string | undefined = undefined;

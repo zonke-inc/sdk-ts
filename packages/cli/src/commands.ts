@@ -30,13 +30,14 @@ export async function deploy(message: string, sourceVersion: string): Promise<vo
     config.environment = environment;
   }
 
-  let buildOutputDirectory = resolve(config.buildOutputDirectory);
-  if (config.packageJsonPath && config.framework === SupportedFrameworks.Remix) {
-    if (!existsSync(join(config.buildOutputDirectory, 'server'))) {
+  const buildOutputDirectory = resolve(config.buildOutputDirectory);
+  const packageJsonPath = config.packageJsonPath ? resolve(config.packageJsonPath) : undefined;
+  if (packageJsonPath && config.framework === SupportedFrameworks.Remix) {
+    if (!existsSync(join(buildOutputDirectory, 'server'))) {
       throw new Error('Server build output directory does not exist.');
     }
 
-    cpSync(config.packageJsonPath, join(config.buildOutputDirectory, 'server', 'package.json'));
+    cpSync(packageJsonPath, join(buildOutputDirectory, 'server', 'package.json'));
   }
 
   let version: PreviewEnvironmentVersion;
