@@ -32,7 +32,7 @@ export async function deploy(message: string, sourceVersion: string): Promise<vo
 
   const buildOutputDirectory = resolve(config.buildOutputDirectory);
   const packageJsonPath = config.packageJsonPath ? resolve(config.packageJsonPath) : undefined;
-  if (packageJsonPath && config.framework === SupportedFrameworks.Remix) {
+  if (packageJsonPath && [SupportedFrameworks.Remix, SupportedFrameworks.VueJs].includes(config.framework)) {
     if (!existsSync(join(buildOutputDirectory, 'server'))) {
       throw new Error('Server build output directory does not exist.');
     }

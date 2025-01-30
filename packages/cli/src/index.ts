@@ -42,7 +42,7 @@ export function cli() {
       let packageJsonPath: string | undefined = undefined;
       let publicDirectory: string | undefined = undefined;
       const frameworkEnum = framework as SupportedFrameworks;
-      if (frameworkEnum === SupportedFrameworks.Remix) {
+      if ([SupportedFrameworks.Remix, SupportedFrameworks.VueJs].includes(frameworkEnum)) {
         packageJsonPath = await input({ message: 'Path to package.json: ' });
       } else if (frameworkEnum === SupportedFrameworks.NextJs) {
         publicDirectory = await input({ message: 'Path to public directory: ' });

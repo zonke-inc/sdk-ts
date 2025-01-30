@@ -39,12 +39,14 @@ const nextConfig = {
 #### Build Folder by Framework
 Each environment specifies a dedicated build output folder that the CLI zips and deploys. These are the expected folders for each framework:
 
+- Astro - `dist`. SSR deployments should have `dist/client` for static assets and `dist/server` for SSR lambda.
 - Dash - The source folder with your Dash `app.py` file. The CLI internally calls `open-dash` to build static assets.
 - Next.js:
   - `export` - `out` or `dist`, depending on build tool.
   - `standalone` - `.next`. Make sure the `.next/standalone` folder exists.
 - React - `out` or `dist`, depending on build tool.
 - Remix - `build` with `build/client` for static assets and `build/server` for SSR lambda.
+- Vue.js - `dist`. SSR deployments should have `dist/client` for static assets and `dist/server` for SSR lambda.
 
 ### Initialize Preview Environment
 To initialize a new Zonké project, use the `init` command and follow the prompts:

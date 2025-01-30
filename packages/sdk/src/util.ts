@@ -163,9 +163,32 @@ export function prepareRemixDeployment(buildFolder: string): PreviewEnvironmentD
   );
 
   return {
-    hasIndexHtml: false,
     serverDirectory: serverPath,
     clientDirectory: join(buildFolder, 'client'),
+    hasIndexHtml: existsSync(join(buildFolder, 'client', 'index.html')),
+  };
+}
+
+
+export function prepareVueDeployment(buildFolder: string): PreviewEnvironmentDeploymentDirectoryMetadata {
+  const serverPath = join(buildFolder, 'server');
+
+  writeVueHandler(serverPath);
+  writeFileSync(join(serverPath, '.npmrc'), 'node-linker=hoisted\nsymlink=false\n', { flag: 'w' });
+
+  runCommand(
+    'npm add compression express morgan @codegenie/serverless-express',
+    serverPath,
+    {
+      ...process.env,
+      NODE_ENV: 'production',
+    }
+  );
+
+  return {
+    serverDirectory: serverPath,
+    clientDirectory: join(buildFolder, 'client'),
+    hasIndexHtml: existsSync(join(buildFolder, 'client', 'index.html')),
   };
 }
 
@@ -225,10 +248,13 @@ export function prepareAstroDeployment(buildFolder: string): PreviewEnvironmentD
 
 
 export function isAstroSsrBuild(buildFolder: string): boolean {
-  return (
-    existsSync(join(buildFolder, 'lambda')) ||  // Exported by @zonke-cloud/astro-adapter.
-    existsSync(join(buildFolder, 'server'))
-  ) && existsSync(join(buildFolder, 'client'));
+  // dist/lambda is exported by @zonke-cloud/astro-adapter.
+  return existsSync(join(buildFolder, 'lambda')) || hasClientServerFolders(buildFolder);
+}
+
+
+export function hasClientServerFolders(buildFolder: string): boolean {
+  return existsSync(join(buildFolder, 'server')) && existsSync(join(buildFolder, 'client'));
 }
 
 
@@ -285,19 +311,66 @@ import morgan from 'morgan';
 let server;
 
 const bootstrap = async () => {
-  const remixHandler = createRequestHandler({
-    build: await import('./index.js'),
-  });
-
   const app = express();
   app.use(compression());
   app.use(morgan('tiny'));
   app.disable('x-powered-by');
 
-  app.all('*', remixHandler);
+  app.use('*all', createRequestHandler({
+    build: await import('./index.js'),
+  }));
 
   return serverlessExpress({ 
     app,
+  });
+};
+
+export const handler = async (event, context, callback) => {
+  server = server ?? await bootstrap();
+
+  return server(event, context, callback);
+};
+  `,
+  { flag: 'w' });
+}
+
+
+/**
+ * Writes the Vue server handler to the server directory.
+ * 
+ * TODO: Figure out a way to copy this as an asset.
+ */
+function writeVueHandler(serverPath: string) {
+  writeFileSync(join(serverPath, 'index.mjs'), `
+import serverlessExpress from '@codegenie/serverless-express';
+import compression from 'compression';
+import express from 'express';
+import morgan from 'morgan';
+
+import { render } from './server.js';
+
+
+let server;
+
+const bootstrap = async () => {
+  const app = express();
+  app.use(compression());
+  app.use(morgan('tiny'));
+  app.disable('x-powered-by');
+
+  app.use('*all', (req, res) => {
+    render(req.url)
+      .then(({ html }) => {
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+      })
+      .catch((e) => {
+        console.error(e);
+        res.status(500).end(e);
+      });
+  });
+
+  return serverlessExpress({ 
+    app: app,
   });
 };
 

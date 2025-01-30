@@ -19,10 +19,12 @@ import {
 } from './payload';
 import {
   deployDirectoryToS3,
+  hasClientServerFolders,
   isAstroSsrBuild,
   prepareAstroDeployment,
   prepareNextJsDeployment,
   prepareRemixDeployment,
+  prepareVueDeployment,
 } from './util';
 
 
@@ -335,8 +337,8 @@ export class PreviewEnvironmentClient {
     message?: string;
   }): Promise<PreviewEnvironmentVersion> {
     let directoryMetadata: PreviewEnvironmentDeploymentDirectoryMetadata = {
-      hasIndexHtml: true,
       clientDirectory: buildOutputDirectory,
+      hasIndexHtml: existsSync(join(buildOutputDirectory, 'index.html')),
     };
 
     if (framework === SupportedFrameworks.NextJs && basename(buildOutputDirectory) === '.next') {
@@ -345,6 +347,8 @@ export class PreviewEnvironmentClient {
       directoryMetadata = prepareRemixDeployment(buildOutputDirectory);
     } else if (framework === SupportedFrameworks.Astro && isAstroSsrBuild(buildOutputDirectory)) {
       directoryMetadata = prepareAstroDeployment(buildOutputDirectory);
+    } else if (framework === SupportedFrameworks.VueJs && hasClientServerFolders(buildOutputDirectory)) {
+      directoryMetadata = prepareVueDeployment(buildOutputDirectory);
     }
 
     let serverVersion: string | undefined = undefined;

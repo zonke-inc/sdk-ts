@@ -1,5 +1,6 @@
 export enum SupportedFrameworks {
   Dash = 'dash',
+  VueJs = 'vuejs',
   Astro = 'astro',
   React = 'react',
   Remix = 'remix',
@@ -43,6 +44,7 @@ export interface DeployToPreviewEnvironmentPayload {
    *    - React static vite - `dist`
    *    - React static webpack - `out`
    *    - Remix - `build` with `build/client` and `build/server` subfolders.
+   *    - Vue.js - `dist` with static files or `dist/client` and `dist/server` subfolders.
    */
   buildOutputDirectory: string;
 
