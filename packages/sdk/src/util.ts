@@ -4,6 +4,7 @@ import {
   cpSync,
   existsSync,
   lstatSync,
+  moveSync,
   readdirSync,
   readFileSync,
   readJsonSync,
@@ -322,13 +323,19 @@ function listDirectory(directory: string): string[] {
  * TODO: Figure out a way to copy this as an asset.
  */
 function writeRemixHandler(serverPath: string) {
-  writeFileSync(join(serverPath, 'server.mjs'), `
+  moveSync(join(serverPath, 'index.js'), join(serverPath, 'server.js'));
+  writeFileSync(join(serverPath, 'index.mjs'), `
 import serverlessExpress from '@codegenie/serverless-express';
 import { createRequestHandler } from '@remix-run/express';
 import compression from 'compression';
 import express from 'express';
+import expressPackageJson from 'express/package.json' with { type: 'json' };
 import morgan from 'morgan';
 
+import * as build from './server.js';
+
+
+const expressMajorVersion = parseInt(expressPackageJson.version.split('.')[0] ?? 0);
 
 let server;
 
@@ -338,8 +345,9 @@ const bootstrap = async () => {
   app.use(morgan('tiny'));
   app.disable('x-powered-by');
 
-  app.use('*all', createRequestHandler({
-    build: await import('./index.js'),
+  const route = expressMajorVersion < 5 ? '*' : '*all';
+  app.use(route, createRequestHandler({
+    build,
   }));
 
   return serverlessExpress({ 
@@ -349,6 +357,8 @@ const bootstrap = async () => {
 
 export const handler = async (event, context, callback) => {
   server = server ?? await bootstrap();
+
+  event.path ??= '/';
 
   return server(event, context, callback);
 };
@@ -367,10 +377,13 @@ function writeVueHandler(serverPath: string) {
 import serverlessExpress from '@codegenie/serverless-express';
 import compression from 'compression';
 import express from 'express';
+import expressPackageJson from 'express/package.json' with { type: 'json' };
 import morgan from 'morgan';
 
 import { render } from './server.js';
 
+
+const expressMajorVersion = parseInt(expressPackageJson.version.split('.')[0] ?? 0);
 
 let server;
 
@@ -380,7 +393,8 @@ const bootstrap = async () => {
   app.use(morgan('tiny'));
   app.disable('x-powered-by');
 
-  app.use('*all', (req, res) => {
+  const route = expressMajorVersion < 5 ? '*' : '*all';
+  app.use(route, (req, res) => {
     render(req.url)
       .then(({ html }) => {
         res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
@@ -398,6 +412,8 @@ const bootstrap = async () => {
 
 export const handler = async (event, context, callback) => {
   server = server ?? await bootstrap();
+
+  event.path ??= '/';
 
   return server(event, context, callback);
 };
