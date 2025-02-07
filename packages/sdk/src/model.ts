@@ -46,6 +46,32 @@ export interface PreviewEnvironment {
 }
 
 
+export interface PostConfigurationField {
+  /**
+   * The POST field key.
+   */
+  key: string;
+
+  /**
+   * The POST field value.
+   */
+  value: string;
+}
+
+
+export interface PostConfiguration {
+  /**
+   * A presigned POST URL you can use to deploy static files to the preview environment.
+   */
+  presignedUrl: string;
+
+  /**
+   * Configuration fields required to deploy files to the preview environment.
+   */
+  fields: PostConfigurationField[];
+}
+
+
 /**
  * A signed URL you can use to deploy to a preview environment.
  */
@@ -64,14 +90,29 @@ export interface PreviewEnvironmentDeploymentEndpoint {
   presignedDeploymentEndpoint: string;
 
   /**
-   * A signed URL you can use to deploy the server-side rendering function to the preview environment.
+   * A signed PUT URL you can use to deploy the server-side rendering function to the preview environment.
    */
   presignedServerDeploymentEndpoint?: string;
 
   /**
-   * A signed URL you can use to deploy static files to the preview environment.
+   * A signed PUT URL you can use to deploy static files to the preview environment.
    */
   presignedClientDeploymentEndpoint?: string;
+
+  /**
+   * The maximum size of the deployment in bytes.
+   */
+  maxDeploymentSize?: number;
+
+  /**
+   * A signed POST configuration you can use to deploy static files to the preview environment.
+   */
+  presignedClientDeploymentConfiguration?: PostConfiguration;
+
+  /**
+   * A signed POST configuration you can use to deploy the server-side rendering function to the preview environment.
+   */
+  presignedServerDeploymentConfiguration?: PostConfiguration;
 }
 
 

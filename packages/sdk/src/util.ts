@@ -15,7 +15,10 @@ import {
 import JSZip from 'jszip';
 import { join, relative, resolve } from 'path';
 
-import type { PreviewEnvironmentDeploymentDirectoryMetadata } from './model';
+import type {
+  PostConfiguration,
+  PreviewEnvironmentDeploymentDirectoryMetadata,
+} from './model';
 
 
 export function zipDirectory(directory: string): Promise<Buffer> {
@@ -39,23 +42,42 @@ export function zipDirectory(directory: string): Promise<Buffer> {
   }
 
   return zip.generateAsync({
-    type: 'nodebuffer',
     platform: 'UNIX',
-    compression: 'STORE',
+    type: 'nodebuffer',
+    compression: 'DEFLATE',
+    compressionOptions: {
+      level: 9,
+    },
   });
 }
 
 
-export async function deployDirectoryToS3(directory: string, deploymentEndpoint: string): Promise<string> {
-  const zipFileBuffer = await zipDirectory(directory);
-
-  const { headers } = await axios.put(
-    deploymentEndpoint,
-    zipFileBuffer,
-    {
+export async function putZipToS3(zipBuffer: Buffer, endpoint: string): Promise<string> {
+  const { headers } = await axios.put(endpoint, zipBuffer, {
       headers: {
         'Content-Type': 'application/zip',
-        'Content-Length': zipFileBuffer.length,
+        'Content-Length': zipBuffer.length,
+      },
+    },
+  ).catch((error) => {
+    throw new Error(error.response.data.message);
+  });
+
+  return headers['x-amz-version-id'];
+}
+
+
+export async function postZipToS3(zipBuffer: Buffer, configuration: PostConfiguration): Promise<string> {
+  const postData = configuration.fields.reduce((acc, field) => {
+    acc[field.key] = field.value;
+    return acc;
+  }, {} as Record<string, string | Buffer>);
+  postData['file'] = zipBuffer;
+
+  const { headers } = await axios.post(configuration.presignedUrl, postData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
       },
     },
   ).catch((error) => {

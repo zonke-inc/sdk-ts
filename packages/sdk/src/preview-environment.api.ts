@@ -1,9 +1,9 @@
 import axios from 'axios';
-import { cpSync, existsSync, mkdtempSync, rmSync } from 'fs-extra';
-import { tmpdir } from 'os';
-import { basename, join, resolve } from 'path';
+import { existsSync } from 'fs-extra';
+import { basename, join } from 'path';
 
 import type {
+  PostConfiguration,
   PreviewEnvironment,
   PreviewEnvironmentClientProps,
   PreviewEnvironmentDeploymentDirectoryMetadata,
@@ -18,13 +18,15 @@ import {
   type RevertPreviewEnvironmentToVersionPayload,
 } from './payload';
 import {
-  deployDirectoryToS3,
   hasClientServerFolders,
   isAstroSsrBuild,
   prepareAstroDeployment,
   prepareNextJsDeployment,
   prepareRemixDeployment,
   prepareVueDeployment,
+  zipDirectory,
+  postZipToS3,
+  putZipToS3,
 } from './util';
 
 
@@ -90,7 +92,6 @@ export class PreviewEnvironmentClient {
     message,
     framework,
     environmentId,
-    publicDirectory,
     buildOutputDirectory,
     uploadLinkExpirationOverride,
   }: DeployToPreviewEnvironmentPayload): Promise<PreviewEnvironmentVersion> {
@@ -115,30 +116,71 @@ export class PreviewEnvironmentClient {
 
     const {
       sourceVersion,
-      presignedDeploymentEndpoint,
+      maxDeploymentSize,
       presignedClientDeploymentEndpoint,
       presignedServerDeploymentEndpoint,
+      presignedClientDeploymentConfiguration,
+      presignedServerDeploymentConfiguration,
     } = data;
 
-    if (presignedClientDeploymentEndpoint && presignedServerDeploymentEndpoint) {
-      return this.deploySplitClientServerBundles({
-        message,
-        framework,
-        environmentId,
-        sourceVersion,
-        buildOutputDirectory,
-        presignedClientDeploymentEndpoint,
-        presignedServerDeploymentEndpoint,
-      });
+    let directoryMetadata: PreviewEnvironmentDeploymentDirectoryMetadata = {
+      clientDirectory: buildOutputDirectory,
+      hasIndexHtml: existsSync(join(buildOutputDirectory, 'index.html')),
+    };
+
+    if (framework === SupportedFrameworks.NextJs && basename(buildOutputDirectory) === '.next') {
+      directoryMetadata = prepareNextJsDeployment(buildOutputDirectory);
+    } else if (framework === SupportedFrameworks.Remix) {
+      directoryMetadata = prepareRemixDeployment(buildOutputDirectory);
+    } else if (framework === SupportedFrameworks.Astro && isAstroSsrBuild(buildOutputDirectory)) {
+      directoryMetadata = prepareAstroDeployment(buildOutputDirectory);
+    } else if (framework === SupportedFrameworks.VueJs && hasClientServerFolders(buildOutputDirectory)) {
+      directoryMetadata = prepareVueDeployment(buildOutputDirectory);
     }
 
-    return this.deployCombinedClientServerBundle({
-      message,
-      environmentId,
-      publicDirectory,
-      buildOutputDirectory,
-      presignedDeploymentEndpoint,
+    let versions: { clientVersion: string; serverVersion?: string; };
+    if (presignedClientDeploymentConfiguration && presignedServerDeploymentConfiguration && maxDeploymentSize) {
+      versions = await this.postDeployClientServerBundles({
+        directoryMetadata,
+        maxDeploymentSize,
+        presignedClientDeploymentConfiguration,
+        presignedServerDeploymentConfiguration,
+      });
+    } else {
+      versions = await this.putDeployClientServerBundles({
+        directoryMetadata,
+        presignedClientDeploymentEndpoint: presignedClientDeploymentEndpoint!,
+        presignedServerDeploymentEndpoint: presignedServerDeploymentEndpoint!,
+      });
+    }
+    
+    await axios.post(
+      `${this.apiEndpoint}/preview-environment/complete-deployment`,
+      {
+        environmentId,
+        sourceVersion,
+        serverVersion: versions.serverVersion,
+        clientVersion: versions.clientVersion,
+        hasIndexHtml: directoryMetadata.hasIndexHtml,
+      },
+      {
+        headers: {
+          Accept: 'application/json',
+          'x-zonke-api-key': this.apiKey,
+          'x-zonke-api-token': this.apiToken,
+          'Content-Type': 'application/json',
+        },
+      },
+    ).catch((error) => {
+      throw new Error(error.response.data.message);
     });
+
+    return {
+      message,
+      isLatest: true,
+      versionId: sourceVersion,
+      lastUpdated: new Date().toISOString(),
+    };
   }
 
 
@@ -253,143 +295,60 @@ export class PreviewEnvironmentClient {
   }
 
 
-  private async deployCombinedClientServerBundle({
-    message,
-    environmentId,
-    publicDirectory,
-    buildOutputDirectory,
-    presignedDeploymentEndpoint,
+  private async postDeployClientServerBundles({
+    directoryMetadata,
+    maxDeploymentSize,
+    presignedClientDeploymentConfiguration,
+    presignedServerDeploymentConfiguration,
   }: {
-    environmentId: string;
-    buildOutputDirectory: string;
-    presignedDeploymentEndpoint: string;
+    maxDeploymentSize: number;
+    presignedClientDeploymentConfiguration: PostConfiguration;
+    presignedServerDeploymentConfiguration: PostConfiguration;
+    directoryMetadata: PreviewEnvironmentDeploymentDirectoryMetadata;
+  }): Promise<{ clientVersion: string; serverVersion?: string; }> {
+    const [clientZip, serverZip] = await Promise.all([
+      zipDirectory(directoryMetadata.clientDirectory),
+      directoryMetadata.serverDirectory ? zipDirectory(directoryMetadata.serverDirectory) : undefined,
+    ]);
 
-    message?: string;
-    publicDirectory?: string;
-  }): Promise<PreviewEnvironmentVersion> {
-    // Copy the build output directory to a temporary directory to preserve the original directory name.
-    const outDirectory = mkdtempSync(join(tmpdir(), 'zip-'));
-    cpSync(buildOutputDirectory, join(outDirectory, basename(resolve(buildOutputDirectory))), {
-      recursive: true,
-    });
-    if (publicDirectory && existsSync(publicDirectory)) {
-      cpSync(publicDirectory, join(outDirectory, 'public'), {
-        recursive: true,
-      });
+    const zipSize = clientZip.length + (serverZip?.length || 0);
+    if (zipSize > maxDeploymentSize) {
+      throw new Error(`The deployment size '${zipSize}' exceeds the maximum allowed size of '${maxDeploymentSize}' bytes.`);
     }
 
-    const versionId = await deployDirectoryToS3(outDirectory, presignedDeploymentEndpoint);
+    const [clientVersion, serverVersion] = await Promise.all([
+      postZipToS3(clientZip, presignedClientDeploymentConfiguration),
+      serverZip ? postZipToS3(serverZip, presignedServerDeploymentConfiguration) : undefined,
+    ]);
 
-    rmSync(outDirectory, {
-      recursive: true,
-    });
-
-    const version: PreviewEnvironmentVersion = {
-      message,
-      versionId,
-      isLatest: true,
-      lastUpdated: new Date().toISOString(),
+    return {
+      clientVersion,
+      serverVersion,
     };
-
-    if (message) {
-      // A deployment tracker is not created in Zonké until after the code is uploaded to S3, so we have to set the 
-      // message after the deployment has been triggered.
-      await axios.post(
-        `${this.apiEndpoint}/preview-environment/set-deployment-message`,
-        {
-          message,
-          environmentId,
-          sourceVersion: version.versionId,
-        },
-        {
-          headers: {
-            Accept: 'application/json',
-            'x-zonke-api-key': this.apiKey,
-            'x-zonke-api-token': this.apiToken,
-            'Content-Type': 'application/json',
-          },
-        },
-      ).catch((error) => {
-        throw new Error(error.response.data.message);
-      });
-    }
-
-    return version;
   }
 
-
-  private async deploySplitClientServerBundles({
-    message,
-    framework,
-    environmentId,
-    sourceVersion,
-    buildOutputDirectory,
+  private async putDeployClientServerBundles({
+    directoryMetadata,
     presignedClientDeploymentEndpoint,
     presignedServerDeploymentEndpoint,
   }: {
-    environmentId: string;
-    sourceVersion: string;
-    buildOutputDirectory: string;
-    framework: SupportedFrameworks;
     presignedClientDeploymentEndpoint: string;
     presignedServerDeploymentEndpoint: string;
-
-    message?: string;
-  }): Promise<PreviewEnvironmentVersion> {
-    let directoryMetadata: PreviewEnvironmentDeploymentDirectoryMetadata = {
-      clientDirectory: buildOutputDirectory,
-      hasIndexHtml: existsSync(join(buildOutputDirectory, 'index.html')),
-    };
-
-    if (framework === SupportedFrameworks.NextJs && basename(buildOutputDirectory) === '.next') {
-      directoryMetadata = prepareNextJsDeployment(buildOutputDirectory);
-    } else if (framework === SupportedFrameworks.Remix) {
-      directoryMetadata = prepareRemixDeployment(buildOutputDirectory);
-    } else if (framework === SupportedFrameworks.Astro && isAstroSsrBuild(buildOutputDirectory)) {
-      directoryMetadata = prepareAstroDeployment(buildOutputDirectory);
-    } else if (framework === SupportedFrameworks.VueJs && hasClientServerFolders(buildOutputDirectory)) {
-      directoryMetadata = prepareVueDeployment(buildOutputDirectory);
-    }
-
-    let serverVersion: string | undefined = undefined;
-    if (directoryMetadata.serverDirectory) {
-      serverVersion = await deployDirectoryToS3(
-        directoryMetadata.serverDirectory,
-        presignedServerDeploymentEndpoint,
-      );
-    }
-
-    const clientVersion = await deployDirectoryToS3(
-      directoryMetadata.clientDirectory,
-      presignedClientDeploymentEndpoint,
-    );
+    directoryMetadata: PreviewEnvironmentDeploymentDirectoryMetadata;
+  }): Promise<{ clientVersion: string; serverVersion?: string; }> {
+    const [clientZip, serverZip] = await Promise.all([
+      zipDirectory(directoryMetadata.clientDirectory),
+      directoryMetadata.serverDirectory ? zipDirectory(directoryMetadata.serverDirectory) : undefined,
+    ]);
     
-    await axios.post(
-      `${this.apiEndpoint}/preview-environment/complete-deployment`,
-      {
-        environmentId,
-        serverVersion,
-        clientVersion,
-        sourceVersion,
-        hasIndexHtml: directoryMetadata.hasIndexHtml,
-      },
-      {
-        headers: {
-          Accept: 'application/json',
-          'x-zonke-api-key': this.apiKey,
-          'x-zonke-api-token': this.apiToken,
-          'Content-Type': 'application/json',
-        },
-      },
-    ).catch((error) => {
-      throw new Error(error.response.data.message);
-    });
-
+    const [clientVersion, serverVersion] = await Promise.all([
+      putZipToS3(clientZip, presignedClientDeploymentEndpoint),
+      serverZip ? putZipToS3(serverZip, presignedServerDeploymentEndpoint) : undefined,
+    ]);
+  
     return {
-      message,
-      isLatest: true,
-      versionId: sourceVersion,
-      lastUpdated: new Date().toISOString(),
+      clientVersion,
+      serverVersion,
     };
   }
 }
