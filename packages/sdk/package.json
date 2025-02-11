@@ -1,6 +1,6 @@
 {
   "name": "@zonke-cloud/sdk",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Zonké infrastructure management SDK. Deploy and manage AWS infrastructure with Zonké.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
